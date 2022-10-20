@@ -1,9 +1,12 @@
 // const http = require("http");
 
 // FILES
-const fs = require("fs");
-const http = require("http");
-const url = require("url");
+const fs = require('fs');
+const http = require('http');
+const url = require('url');
+const slugify = require('slugify');
+const replaceTemplate = require('./module/replaceTemplate');
+
 // const server = http.createServer((req, res) => {
 //   const url = req.url;
 //   const method = req.method;
@@ -79,68 +82,66 @@ const url = require("url");
 
 // Top level code to execute only once
 
-const replaceTemplate = (temp, product) => {
-  let output = temp.replace(/{%PRODUCTNAME%}/g, product.productName);
-  output = output.replace(/{%IMAGE%}/g, product.image);
-  output = output.replace(/{%FROM%}/g, product.from);
-  output = output.replace(/{%QUANTITY%}/g, product.quantity);
-  output = output.replace(/{%PRICE%}/g, product.price);
-  output = output.replace(/{%DESCRIPTION%}/g, product.price);
-  output = output.replace(/{%ID%}/g, product.id);
-
-  if (!product.organic)
-    output = output.replace(/{%NOT_ORGANIC%}/g, "not-organic");
-
-  return output;
-};
+// replacing placeholder with dynamic data
 
 // the data object
-const data = fs.readFileSync(`${__dirname}/dev-data/data.json`, "utf8");
+const data = fs.readFileSync(`${__dirname}/dev-data/data.json`, 'utf8');
 const dataObject = JSON.parse(data);
 
+const slugs = dataObject.map((el) => slugify(el.productName, { lower: true }));
+console.log(slugs);
 // the html template
-const tempOverview = fs.readFileSync(
-  `${__dirname}/template/template-overview.html`,
-  "utf-8"
-);
-const tempProduct = fs.readFileSync(
-  `${__dirname}/template/product-template.html`,
-  "utf-8"
-);
-const tempCard = fs.readFileSync(
-  `${__dirname}/template/card-template.html`,
-  "utf-8"
-);
 
+// reading overview html page
+const tempOverview = fs.readFileSync(`${__dirname}/template/template-overview.html`, 'utf-8');
+
+// reading individual product page
+const tempProduct = fs.readFileSync(`${__dirname}/template/product-template.html`, 'utf-8');
+
+// reading data for each card of product in overview page
+const tempCard = fs.readFileSync(`${__dirname}/template/card-template.html`, 'utf-8');
+
+// creating server
 const server = http.createServer((req, res) => {
-  const pathName = req.url;
+  const { query, pathname } = url.parse(req.url, true);
 
-  if (pathName === "/" || pathName === "/overview") {
-    res.writeHead("200", { "Content-Type": "text/html" });
+  // overview page
+  if (pathname === '/' || pathname === '/overview') {
+    res.writeHead('200', { 'Content-Type': 'text/html' });
 
-    const cardsHTML = dataObject
-      .map((el) => replaceTemplate(tempCard, el))
-      .join("");
+    const cardsHTML = dataObject.map((el) => replaceTemplate(tempCard, el)).join('');
 
-    const output = tempOverview.replace("{%PRODUCT_CARDS%}", cardsHTML);
+    const output = tempOverview.replace('{%PRODUCT_CARDS%}', cardsHTML);
     res.end(output);
-  } else if (pathName === "/" || pathName === "/product") {
-    res.writeHead("200", { "Content-Type": "text/html" });
-    res.end(tempProduct);
-  } else if (pathName === "/api") {
-    res.writeHead("200", { "Content-Type": "text/html" });
+  }
+
+  // product page
+  else if (pathname === '/product') {
+    res.writeHead('200', { 'Content-Type': 'text/html' });
+    const product = dataObject[query.id];
+    const output = replaceTemplate(tempProduct, product);
+    res.end(output);
+  }
+
+  // API page
+  else if (pathname === '/api') {
+    res.writeHead('200', { 'Content-Type': 'text/html' });
     res.end(data);
-  } else {
-    res.writeHead("404", {
-      "Content-type": "text/html",
-      "my-own-header": "hello-there",
+  }
+
+  // error page
+  else {
+    res.writeHead('404', {
+      'Content-type': 'text/html',
+      'my-own-header': 'hello-there',
     });
     {
-      res.end("<h1>Hello I am real</h1>");
+      res.end('<h1>Hello I am real</h1>');
     }
   }
 });
 
-server.listen(8000, "127.0.0.1", () => {
-  console.log("listening on port 8000");
+// port to listen
+server.listen(8000, '127.0.0.1', () => {
+  console.log('listening on port 8000');
 });
